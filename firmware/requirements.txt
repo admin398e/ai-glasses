@@ -1,0 +1,9 @@
+websockets>=12.0
+aiohttp>=3.9
+Pillow>=10.0
+pygame>=2.5          # dev only — not needed on Pi headless
+
+# Optional hardware drivers (uncomment on Pi)
+# adafruit-circuitpython-bno055
+# pyaudio
+# webrtcvad
