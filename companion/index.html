@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>AI Glasses — Control</title>
+<style>
+  :root {
+    --green: #00ff64;
+    --amber: #ffb400;
+    --red: #ff3c3c;
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --border: #222;
+    --text: #e0e0e0;
+    --dim: #666;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    min-height: 100vh;
+    padding: 16px;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 0 16px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+  .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--red);
+    flex-shrink: 0;
+  }
+  .dot.connected { background: var(--green); }
+  h1 { font-size: 18px; font-weight: 600; }
+  .status-text { margin-left: auto; font-size: 13px; color: var(--dim); }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .card h2 { font-size: 13px; font-weight: 600; color: var(--dim); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 12px; }
+
+  input[type=text], textarea {
+    width: 100%;
+    background: #1a1a1a;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 15px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    outline: none;
+  }
+  input[type=text]:focus, textarea:focus { border-color: var(--green); }
+  textarea { resize: vertical; min-height: 80px; }
+
+  button {
+    background: var(--green);
+    border: none;
+    border-radius: 8px;
+    color: #000;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 10px 18px;
+    width: 100%;
+  }
+  button:active { opacity: .85; }
+  button.secondary {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  button.danger { background: var(--red); }
+
+  .btn-row { display: flex; gap: 8px; }
+  .btn-row button { flex: 1; }
+
+  .log {
+    font-size: 12px;
+    font-family: monospace;
+    color: var(--dim);
+    max-height: 160px;
+    overflow-y: auto;
+    background: #0d0d0d;
+    border-radius: 8px;
+    padding: 10px;
+  }
+  .log p { line-height: 1.6; }
+  .log .g { color: var(--green); }
+  .log .a { color: var(--amber); }
+  .log .r { color: var(--red); }
+
+  .telemetry {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .tel-item {
+    background: #0d0d0d;
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+  }
+  .tel-item .val { font-size: 20px; font-weight: 700; color: var(--green); }
+  .tel-item .lbl { font-size: 11px; color: var(--dim); margin-top: 2px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="dot" id="dot"></div>
+  <h1>AI Glasses</h1>
+  <span class="status-text" id="status-text">Connecting…</span>
+</header>
+
+<!-- Telemetry -->
+<div class="card">
+  <h2>Glasses Status</h2>
+  <div class="telemetry">
+    <div class="tel-item"><div class="val" id="tel-battery">—</div><div class="lbl">Battery</div></div>
+    <div class="tel-item"><div class="val" id="tel-heading">—</div><div class="lbl">Heading</div></div>
+    <div class="tel-item"><div class="val" id="tel-fps">—</div><div class="lbl">Status</div></div>
+  </div>
+</div>
+
+<!-- Quick actions -->
+<div class="card">
+  <h2>Quick Actions</h2>
+  <div class="btn-row">
+    <button class="secondary" onclick="sendCmd('clear', {})">Clear HUD</button>
+    <button class="secondary" onclick="sendCmd('notify', {text: 'Hello from companion!', duration: 5})">Test Notify</button>
+  </div>
+</div>
+
+<!-- Ask AI -->
+<div class="card">
+  <h2>Ask AI</h2>
+  <input type="text" id="ai-question" placeholder="Ask something… (shown on glasses)">
+  <button onclick="askAI()">Send to Glasses</button>
+</div>
+
+<!-- Send text -->
+<div class="card">
+  <h2>Show Text on HUD</h2>
+  <input type="text" id="hud-text" placeholder="Text to display">
+  <div class="btn-row">
+    <input type="number" id="hud-duration" placeholder="Secs (0=permanent)" style="flex:1;width:auto">
+    <button onclick="showText()" style="flex:2">Show</button>
+  </div>
+</div>
+
+<!-- Translate -->
+<div class="card">
+  <h2>Translate</h2>
+  <textarea id="translate-text" placeholder="Text to translate…"></textarea>
+  <input type="text" id="translate-lang" placeholder="Target language (e.g. French)">
+  <button onclick="translateText()">Translate on Glasses</button>
+</div>
+
+<!-- Log -->
+<div class="card">
+  <h2>Log</h2>
+  <div class="log" id="log"></div>
+</div>
+
+<!-- Danger -->
+<div class="card">
+  <button class="danger" onclick="sendCmd('clear', {})">Emergency Clear HUD</button>
+</div>
+
+<script>
+const SERVER = location.hostname === 'localhost'
+  ? 'ws://localhost:8765/companion'
+  : `ws://${location.hostname}:8765/companion`;
+
+let ws, reconnectTimer;
+
+function connect() {
+  log(`Connecting to ${SERVER}…`, 'a');
+  ws = new WebSocket(SERVER);
+
+  ws.onopen = () => {
+    dot(true);
+    log('Connected', 'g');
+  };
+
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    handleIncoming(msg);
+  };
+
+  ws.onclose = () => {
+    dot(false);
+    log('Disconnected — retrying in 3s', 'r');
+    clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(connect, 3000);
+  };
+
+  ws.onerror = () => {
+    log('WebSocket error', 'r');
+  };
+}
+
+function sendCmd(type, data) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    log('Not connected', 'r');
+    return;
+  }
+  ws.send(JSON.stringify({ type, data }));
+  log(`→ ${type}: ${JSON.stringify(data).slice(0, 60)}`, 'g');
+}
+
+function askAI() {
+  const q = document.getElementById('ai-question').value.trim();
+  if (!q) return;
+  sendCmd('ask_ai', { question: q });
+  document.getElementById('ai-question').value = '';
+}
+
+function showText() {
+  const text = document.getElementById('hud-text').value.trim();
+  const duration = parseFloat(document.getElementById('hud-duration').value) || 8;
+  if (!text) return;
+  sendCmd('show_text', { text, duration });
+}
+
+function translateText() {
+  const text = document.getElementById('translate-text').value.trim();
+  const language = document.getElementById('translate-lang').value.trim() || 'English';
+  if (!text) return;
+  sendCmd('translate', { text, language });
+}
+
+function handleIncoming(msg) {
+  const { type, data } = msg;
+  if (type === 'battery') {
+    document.getElementById('tel-battery').textContent = data.percent + '%';
+  } else if (type === 'imu') {
+    document.getElementById('tel-heading').textContent = Math.round(data.heading) + '°';
+  } else if (type === 'status') {
+    document.getElementById('tel-fps').textContent = data.value;
+  } else if (type === 'ai_result') {
+    log(`AI [${data.feature}]: ${data.text}`, 'g');
+  }
+}
+
+function dot(on) {
+  document.getElementById('dot').className = 'dot' + (on ? ' connected' : '');
+  document.getElementById('status-text').textContent = on ? 'Connected' : 'Disconnected';
+}
+
+function log(msg, cls = '') {
+  const el = document.getElementById('log');
+  const p = document.createElement('p');
+  if (cls) p.className = cls;
+  p.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  el.appendChild(p);
+  el.scrollTop = el.scrollHeight;
+}
+
+// Keyboard shortcut — Enter to send AI question
+document.getElementById('ai-question').addEventListener('keydown', e => {
+  if (e.key === 'Enter') askAI();
+});
+
+connect();
+</script>
+</body>
+</html>
